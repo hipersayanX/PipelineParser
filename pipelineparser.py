@@ -433,6 +433,37 @@ class PipelineParser:
                     if aSequences[j][i][1] == oldId:
                         aSequences[j][i][1] = newId
 
+    def addElement(self, i=0, j=0, element=[], aSequences=[]):
+        aSequences[i][j] = element
+
+    def removeElement(self, id='', instances={}, connections=[], ss=[], aSequences=[]):
+        del instances[id]
+
+        i = 0
+
+        while i < len(connections):
+            if connections[i][0] == id or connections[i][1] == id:
+                del connections[i]
+
+                continue
+
+            i += 1
+
+        i = 0
+
+        while i < len(ss):
+            if ss[i][0] == id or ss[i][2] == id:
+                del ss[i]
+
+                continue
+
+            i += 1
+
+        for j in range(len(aSequences)):
+            for i in range(len(aSequences[j])):
+                if aSequences[j][i][1] == id:
+                    aSequences[j][i] = []
+
     def pipelineDiff(self, pipeline1='', pipeline2=''):
         instances1, connections1, ss1 = self.parsePipeline(pipeline1)
         instances2, connections2, ss2 = self.parsePipeline(pipeline2)
@@ -446,18 +477,21 @@ class PipelineParser:
             for j in range(len(s1[i])):
                 if s1[i][j] == []:
                     if self.isIdInUse(s2[i][j][1], instances1):
-                        self.changeId(s2[i][j][1], '.{0}'.format(s2[i][j][1]), instances1, connections1, ss1, s1)
                         print('Change Id {0} -> {1}'.format(s2[i][j][1], '.{0}'.format(s2[i][j][1])))
+                        self.changeId(s2[i][j][1], '.{0}'.format(s2[i][j][1]), instances1, connections1, ss1, s1)
 
+                    self.addElement(i, j, s2[i][j], s1)
                     print('Add Element {0}'.format(s2[i][j]))
                 elif s2[i][j] == []:
                     print('Remove Element {0}'.format(s1[i][j][1]))
-                elif s1[i][j][1] != s2[i][j][1]:
+                    self.removeElement(s1[i][j][1], instances1, connections1, ss1, s1)
+                elif s1[i][j] != [] and s2[i][j] != [] and s1[i][j][1] != s2[i][j][1]:
                     if self.isIdInUse(s2[i][j][1], instances1):
-                        self.changeId(s2[i][j][1], '.{0}'.format(s2[i][j][1]), instances1, connections1, ss1, s1)
                         print('Change Id {0} -> {1}'.format(s2[i][j][1], '.{0}'.format(s2[i][j][1])))
+                        self.changeId(s2[i][j][1], '.{0}'.format(s2[i][j][1]), instances1, connections1, ss1, s1)
 
                     print('Change Id {0} -> {1}'.format(s1[i][j][1], s2[i][j][1]))
+                    self.changeId(s1[i][j][1], s2[i][j][1], instances1, connections1, ss1, s1)
 
 
 pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
