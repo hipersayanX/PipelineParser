@@ -25,13 +25,15 @@ import re
 class PipelineParser:
     class DiffOp:
         NoOp = 0
-        ChangeId = 1
-        AddElement = 2
-        RemoveElement = 3
-        ConnectElement = 4
-        DisconnectElement = 5
-        ConnectSignalsAndSlots = 6
-        DisconnectSignalsAndSlots = 7
+        RemoveElement = 1
+        ChangeId = 2
+        AddElement = 3
+        setProperty = 4
+        resetProperty = 5
+        ConnectElement = 6
+        DisconnectElement = 7
+        ConnectSignalsAndSlots = 8
+        DisconnectSignalsAndSlots = 9
 
     def parsePipeline(self, pipeline=''):
         # sender receiver.slot<.signal
@@ -167,30 +169,56 @@ class PipelineParser:
         instances2, connections2, ss2 = self.parsePipeline(pipeline2)
 
         cInstances1 = instances1.copy()
-        add = instances2.copy()
+        cInstances2 = instances2.copy()
 
         remove = []
         changeId = []
+        setProperties = {}
+        resetProperties = {}
 
         while cInstances1 != {}:
             instance1 = cInstances1.popitem()
-            keep = False
+            bestMatchId = ''
 
-            for instance2 in add:
-                if instance1[1][0] == add[instance2][0]:
-                    if instance1[0] != instance2:
-                        if instance2 in cInstances1:
-                            changeId.append([instance1[0], '.{0}'.format(instance2)])
-                        else:
-                            changeId.append([instance1[0], instance2])
+            for instance2 in cInstances2:
+                if instance1[1][0] == cInstances2[instance2][0]:
+                    if bestMatchId == '':
+                        bestMatchId = instance2
+                    elif 'objectName' in instance1[1][1] and \
+                         'objectName' in cInstances2[instance2][1] and \
+                         instance1[1][1]['objectName'] == cInstances2[instance2][1]['objectName']:
+                        bestMatchId = instance2
 
-                    del add[instance2]
-                    keep = True
+                        break
 
-                    break
-
-            if not keep:
+            if bestMatchId == '':
                 remove.append(instance1[0])
+            else:
+                if instance1[0] != bestMatchId:
+                    if bestMatchId in cInstances1:
+                        changeId.append([instance1[0], '.{0}'.format(bestMatchId)])
+                    else:
+                        changeId.append([instance1[0], bestMatchId])
+
+                setProps = {}
+
+                for prop in cInstances2[bestMatchId][1]:
+                    if not prop in instance1[1][1] or (prop in instance1[1][1] and cInstances2[bestMatchId][1][prop] != instance1[1][1][prop]):
+                        setProps[prop] = cInstances2[bestMatchId][1][prop]
+
+                if setProps != {}:
+                    setProperties[bestMatchId] = setProps
+
+                resetProps = []
+
+                for prop in instance1[1][1]:
+                    if not prop in cInstances2[bestMatchId][1]:
+                        resetProps.append(prop)
+
+                if resetProps != []:
+                    resetProperties[bestMatchId] = resetProps
+
+                del cInstances2[bestMatchId]
 
         i = 0
 
@@ -203,23 +231,33 @@ class PipelineParser:
 
             i += 1
 
+        add = {}
+
+        for instance in cInstances2:
+            add[instance] = cInstances2[instance][0]
+
+            if cInstances2[instance][1] != {}:
+                setProperties[instance] = cInstances2[instance][1]
+
         print(remove)
         print(changeId)
         print(add)
+        print(setProperties)
+        print(resetProperties)
 
 
 pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
             'el1. ! element2 .signal1>el5.slot1 ' \
             'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element1 ! element5 ! el5. ' \
-            'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
-            'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 el1.slot1<.signal1'
+            'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
+            'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val10 el1.slot1<.signal1'
 
 pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
             'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 el1.slot1<.signal1 ' \
             'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
             'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
             'el1. ! element2 .signal1>el5.slot1 ' \
-            'element10 ! element12 ' \
+            'element10 prop1=78 ! element12 ' \
             'element11'
 
 #pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
