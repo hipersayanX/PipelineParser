@@ -24,16 +24,15 @@ import re
 
 class PipelineParser:
     class DiffOp:
-        NoOp = 0
-        RemoveElement = 1
-        ChangeId = 2
-        AddElement = 3
-        setProperty = 4
-        resetProperty = 5
-        ConnectElement = 6
-        DisconnectElement = 7
+        DisconnectSignalsAndSlots = 0
+        DisconnectElement = 1
+        RemoveElement = 2
+        ChangeId = 3
+        AddElement = 4
+        SetProperties = 5
+        ResetProperties = 6
+        ConnectElement = 7
         ConnectSignalsAndSlots = 8
-        DisconnectSignalsAndSlots = 9
 
     def parsePipeline(self, pipeline=''):
         # sender receiver.slot<.signal
@@ -171,10 +170,15 @@ class PipelineParser:
         cInstances1 = instances1.copy()
         cInstances2 = instances2.copy()
 
-        remove = []
+        cConnections1 = connections1[:]
+        cConnections2 = connections2[:]
+
+        disconnectElement = []
+        removeElement = []
         changeId = []
         setProperties = {}
         resetProperties = {}
+        connectElement = []
 
         while cInstances1 != {}:
             instance1 = cInstances1.popitem()
@@ -192,7 +196,15 @@ class PipelineParser:
                         break
 
             if bestMatchId == '':
-                remove.append(instance1[0])
+                removeElement.append(instance1[0])
+                i = 0
+
+                while i < len(cConnections1):
+                    if cConnections1[i][0] == instance1[0] or cConnections1[i][1] == instance1[0]:
+                        disconnectElement.append(cConnections1[i])
+                        del cConnections1[i]
+                    else:
+                        i += 1
             else:
                 if instance1[0] != bestMatchId:
                     if bestMatchId in cInstances1:
@@ -224,26 +236,101 @@ class PipelineParser:
 
         while i < len(changeId):
             if changeId[i][1].startswith('.'):
-                if changeId[i][1][1:] in remove:
+                if changeId[i][1][1:] in removeElement:
                     changeId[i][1] = changeId[i][1][1:]
                 else:
                     changeId.append([changeId[i][1], changeId[i][1][1:]])
 
             i += 1
 
-        add = {}
+        i = 0
+
+        while i < len(cConnections1):
+            dstConnection = cConnections1[i][:]
+            fst = False
+            snd = False
+
+            for change in changeId:
+                dst = change[1][1:] if change[1].startswith('.') else change[1]
+
+                if not fst and dstConnection[0] == change[0]:
+                    dstConnection[0] = dst
+                    fst = True
+
+                if not snd and dstConnection[1] == change[0]:
+                    dstConnection[1] = dst
+                    snd = True
+
+                if fst and snd:
+                    break
+
+            if not dstConnection in cConnections2 and not list(reversed(dstConnection)) in cConnections2:
+                disconnectElement.append(cConnections1[i])
+                del cConnections1[i]
+            else:
+                i += 1
+
+        i = 0
+
+        while i < len(cConnections2):
+            dstConnection = cConnections2[i][:]
+            fst = False
+            snd = False
+
+            for change in changeId:
+                src = change[1][1:] if change[1].startswith('.') else change[1]
+
+                if not fst and dstConnection[0] == src:
+                    dstConnection[0] = change[0]
+                    fst = True
+
+                if not snd and dstConnection[1] == src:
+                    dstConnection[1] = change[0]
+                    snd = True
+
+                if fst and snd:
+                    break
+
+            if not dstConnection in cConnections1 and not list(reversed(dstConnection)) in cConnections1:
+                connectElement.append(cConnections2[i])
+                del cConnections2[i]
+            else:
+                i += 1
+
+        addElement = {}
 
         for instance in cInstances2:
-            add[instance] = cInstances2[instance][0]
+            addElement[instance] = cInstances2[instance][0]
 
             if cInstances2[instance][1] != {}:
                 setProperties[instance] = cInstances2[instance][1]
 
-        print(remove)
-        print(changeId)
-        print(add)
-        print(setProperties)
-        print(resetProperties)
+            i = 0
+
+            while i < len(cConnections2):
+                if cConnections2[i][0] == instance or cConnections2[i][1] == instance:
+                    connectElement.append(cConnections2[i])
+                    del cConnections2[i]
+                else:
+                    i += 1
+
+        print('Disconnect Signals And Slots: {0}\n' \
+              'Disconnect Element: {1}\n' \
+              'Remove Element: {2}\n' \
+              'Change Id: {3}\n' \
+              'Add Element: {4}\n' \
+              'Set Properties: {5}\n' \
+              'Reset Properties: {6}\n' \
+              'Connect Element: {7}\n' \
+              'Connect Signals And Slots: {8}'.format(None,
+                                                      disconnectElement,
+                                                      removeElement,
+                                                      changeId,
+                                                      addElement,
+                                                      setProperties,
+                                                      resetProperties,
+                                                      connectElement,
+                                                      None))
 
 
 pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
@@ -270,3 +357,5 @@ pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
 
 pp = PipelineParser()
 pp.pipelineDiff(pipeline1, pipeline2)
+
+# Conectar desconectar en ChangeId
