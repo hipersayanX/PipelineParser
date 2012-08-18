@@ -56,16 +56,30 @@ class PipelineParser:
         i = 0
         j = 0
 
-        r = re.findall('[0-9a-zA-Z]+=\'[^\r^\n]+\'|'  # Property strings.
-                       '[0-9a-zA-Z]+="[^\r^\n]+"|'
-                       '[0-9a-zA-Z]+=\[[^\r^\n]+\]|'  # Property lists.
-                       '[0-9a-zA-Z]+=\{[^\r^\n]+\}|'  # Property dictionaries.
-                       '[0-9a-zA-Z]+=[^\r^\n^ ]+|'    # Property any.
-                       '!{1}|'                        # Pipe.
-                       '[0-9a-zA-Z.]+<[0-9a-zA-Z.]+|' # Signal & Slot
-                       '[0-9a-zA-Z.]+>[0-9a-zA-Z.]+|'
-                       '[0-9a-zA-Z]+\.|'              # Reference
-                       '[0-9a-zA-Z]+', pipeline)      # Element.
+        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*=\'[^\']+\'|'                # Property strings.
+                       '[a-zA-Z_][0-9a-zA-Z_]*="[^"]+"|'
+                       '[a-zA-Z_][0-9a-zA-Z_]*=\[[^\r^\n]+\]|'             # Property lists.
+                       '[a-zA-Z_][0-9a-zA-Z_]*=\{[^\r^\n]+\}|'             # Property dictionaries.
+                       '[a-zA-Z_][0-9a-zA-Z_]*=[^\r^\n^ ]+|'               # Property any.
+                       '!{1}|'                                             # Pipe.
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*<' # Signal & Slot
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*<'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*>'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*>'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_][0-9a-zA-Z_]*\.|'                         # Reference
+                       '[a-zA-Z_][0-9a-zA-Z_]*', pipeline)                 # Element.
 
         for k, p in enumerate(r):
             if '=' in p:
