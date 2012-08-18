@@ -34,10 +34,15 @@ class PipelineParser:
         ConnectElement = 7
         ConnectSignalsAndSlots = 8
 
+    def __init__(self):
+        self.instances1 = {}
+        self.connections1 = []
+        self.ss1 = []
+
     def parsePipeline(self, pipeline=''):
-        # sender receiver.slot<.signal
+        # sender receiver.slot<signal
         # receiver slot<sender.signal
-        # sender .signal>receiver.slot
+        # sender signal>receiver.slot
         # receiver sender.signal>slot
         #
         # [sender, signal, receiver, slot]
@@ -65,28 +70,34 @@ class PipelineParser:
                 s1, s2 = p.split('<')
 
                 if '.' in s1:
-                    sender = '{0},{1}'.format(i, j)
-                    signal = s2[1:]
                     receiver, slot = s1.split('.')
                     receiver += '.'
                 else:
-                    sender, signal = s2.split('.')
-                    sender += '.'
                     receiver = '{0},{1}'.format(i, j)
                     slot = s1
+
+                if '.' in s2:
+                    sender, signal = s2.split('.')
+                    sender += '.'
+                else:
+                    sender = '{0},{1}'.format(i, j)
+                    signal = s2
 
                 ss.append([sender, signal, receiver, slot])
             elif '>' in p:
                 s1, s2 = p.split('>')
 
-                if '.' in s2:
+                if '.' in s1:
+                    sender, signal = s1.split('.')
+                    sender += '.'
+                else:
                     sender = '{0},{1}'.format(i, j)
-                    signal = s1[1:]
+                    signal = s1
+
+                if '.' in s2:
                     receiver, slot = s2.split('.')
                     receiver += '.'
                 else:
-                    sender, signal = s1.split('.')
-                    sender += '.'
                     receiver = '{0},{1}'.format(i, j)
                     slot = s2
 
@@ -163,22 +174,26 @@ class PipelineParser:
 
         return instances, connections, ss
 
-    def pipelineDiff(self, pipeline1='', pipeline2=''):
-        instances1, connections1, ss1 = self.parsePipeline(pipeline1)
+    def pipelineDiff(self, pipeline2=''):
         instances2, connections2, ss2 = self.parsePipeline(pipeline2)
 
-        cInstances1 = instances1.copy()
+        cInstances1 = self.instances1.copy()
         cInstances2 = instances2.copy()
 
-        cConnections1 = connections1[:]
+        cConnections1 = self.connections1[:]
         cConnections2 = connections2[:]
 
+        cSs1 = self.ss1[:]
+        cSs2 = ss2[:]
+
+        disconnectSignalsAndSlots = []
         disconnectElement = []
         removeElement = []
         changeId = []
         setProperties = {}
         resetProperties = {}
         connectElement = []
+        connectSignalsAndSlots = []
 
         while cInstances1 != {}:
             instance1 = cInstances1.popitem()
@@ -203,6 +218,15 @@ class PipelineParser:
                     if cConnections1[i][0] == instance1[0] or cConnections1[i][1] == instance1[0]:
                         disconnectElement.append(cConnections1[i])
                         del cConnections1[i]
+                    else:
+                        i += 1
+
+                i = 0
+
+                while i < len(cSs1):
+                    if cSs1[i][0] == instance1[0] or cSs1[i][2] == instance1[0]:
+                        disconnectSignalsAndSlots.append(cSs1[i])
+                        del cSs1[i]
                     else:
                         i += 1
             else:
@@ -297,6 +321,60 @@ class PipelineParser:
             else:
                 i += 1
 
+        i = 0
+
+        while i < len(cSs1):
+            dstSs = cSs1[i][:]
+            fst = False
+            snd = False
+
+            for change in changeId:
+                dst = change[1][1:] if change[1].startswith('.') else change[1]
+
+                if not fst and dstSs[0] == change[0]:
+                    dstSs[0] = dst
+                    fst = True
+
+                if not snd and dstSs[2] == change[0]:
+                    dstSs[2] = dst
+                    snd = True
+
+                if fst and snd:
+                    break
+
+            if not dstSs in cSs2:
+                disconnectSignalsAndSlots.append(cSs1[i])
+                del cSs1[i]
+            else:
+                i += 1
+
+        i = 0
+
+        while i < len(cSs2):
+            dstSs = cSs2[i][:]
+            fst = False
+            snd = False
+
+            for change in changeId:
+                src = change[1][1:] if change[1].startswith('.') else change[1]
+
+                if not fst and dstSs[0] == src:
+                    dstSs[0] = change[0]
+                    fst = True
+
+                if not snd and dstSs[2] == src:
+                    dstSs[2] = change[0]
+                    snd = True
+
+                if fst and snd:
+                    break
+
+            if not dstSs in cSs1:
+                connectSignalsAndSlots.append(cSs2[i])
+                del cSs2[i]
+            else:
+                i += 1
+
         addElement = {}
 
         for instance in cInstances2:
@@ -314,48 +392,90 @@ class PipelineParser:
                 else:
                     i += 1
 
-        print('Disconnect Signals And Slots: {0}\n' \
-              'Disconnect Element: {1}\n' \
-              'Remove Element: {2}\n' \
-              'Change Id: {3}\n' \
-              'Add Element: {4}\n' \
-              'Set Properties: {5}\n' \
-              'Reset Properties: {6}\n' \
-              'Connect Element: {7}\n' \
-              'Connect Signals And Slots: {8}'.format(None,
-                                                      disconnectElement,
-                                                      removeElement,
-                                                      changeId,
-                                                      addElement,
-                                                      setProperties,
-                                                      resetProperties,
-                                                      connectElement,
-                                                      None))
+            i = 0
+
+            while i < len(cSs2):
+                if cSs2[i][0] == instance or cSs2[i][2] == instance:
+                    connectSignalsAndSlots.append(cSs2[i])
+                    del cSs2[i]
+                else:
+                    i += 1
+
+        ops = []
+
+        for ss in disconnectSignalsAndSlots:
+            ops.append([self.DiffOp.DisconnectSignalsAndSlots, ss])
+
+        for connection in disconnectElement:
+            ops.append([self.DiffOp.DisconnectElement, connection])
+
+        for elementId in removeElement:
+            ops.append([self.DiffOp.RemoveElement, [elementId]])
+
+        for change in changeId:
+            ops.append([self.DiffOp.ChangeId, change])
+
+        for elementId in addElement:
+            ops.append([self.DiffOp.AddElement, [elementId, addElement[elementId]]])
+
+        for elementId in setProperties:
+            for prop in setProperties[elementId]:
+                ops.append([self.DiffOp.SetProperties, [elementId, prop, setProperties[elementId][prop]]])
+
+        for elementId in resetProperties:
+            for prop in resetProperties[elementId]:
+                ops.append([self.DiffOp.ResetProperties, [elementId, prop]])
+
+        for connection in connectElement:
+            ops.append([self.DiffOp.ConnectElement, connection])
+
+        for ss in connectSignalsAndSlots:
+            ops.append([self.DiffOp.ConnectSignalsAndSlots, ss])
+
+        self.instances1 = instances2
+        self.connections1 = connections2
+        self.ss1 = ss2
+
+        return ops
 
 
-pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
-            'el1. ! element2 .signal1>el5.slot1 ' \
-            'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element1 ! element5 ! el5. ' \
-            'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
-            'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val10 el1.slot1<.signal1'
+if __name__ == '__main__':
+    pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
+                'el1. ! element2 ' \
+                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element1 signal>el1.slot ! element5 ! el5. ' \
+                'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
+                'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val10 el1.slot1<signal1'
 
-pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
-            'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 el1.slot1<.signal1 ' \
-            'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
-            'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
-            'el1. ! element2 .signal1>el5.slot1 ' \
-            'element10 prop1=78 ! element12 ' \
-            'element11'
+    pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
+                'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 ' \
+                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
+                'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
+                'el1. ! element2 signal1>el5.slot1 ' \
+                'element10 prop1=78 ! element12 ' \
+                'element11 signal1>el5.slot1'
 
-#pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
-            #'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 el1.slot1<.signal1 ' \
-            #'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ! el5. ' \
-            #'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
-            #'el1. ! element2 .signal1>el5.slot1 ' \
-            #'element10 ! element12 ' \
-            #'element11'
+    pp = PipelineParser()
 
-pp = PipelineParser()
-pp.pipelineDiff(pipeline1, pipeline2)
+    pp.pipelineDiff(pipeline1)
 
-# Conectar desconectar en ChangeId
+    for op in pp.pipelineDiff(pipeline2):
+        if op[0] == PipelineParser.DiffOp.DisconnectSignalsAndSlots:
+            opName = 'DisconnectSignalsAndSlots'
+        elif op[0] == PipelineParser.DiffOp.DisconnectElement:
+            opName = 'DisconnectElement'
+        elif op[0] == PipelineParser.DiffOp.RemoveElement:
+            opName = 'RemoveElement'
+        elif op[0] == PipelineParser.DiffOp.ChangeId:
+            opName = 'ChangeId'
+        elif op[0] == PipelineParser.DiffOp.AddElement:
+            opName = 'AddElement'
+        elif op[0] == PipelineParser.DiffOp.SetProperties:
+            opName = 'SetProperties'
+        elif op[0] == PipelineParser.DiffOp.ResetProperties:
+            opName = 'ResetProperties'
+        elif op[0] == PipelineParser.DiffOp.ConnectElement:
+            opName = 'ConnectElement'
+        else:
+            opName = 'ConnectSignalsAndSlots'
+
+        print('{0} {1}'.format(opName, op[1]))
