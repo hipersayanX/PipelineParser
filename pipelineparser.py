@@ -39,6 +39,111 @@ class PipelineParser:
         self.connections1 = []
         self.ss1 = []
 
+    def parseValue(self, value):
+        if value.startswith('\'') or value.startswith('"'):
+            return value[1: -1]
+        elif value.startswith('{'):
+            r = re.findall('[0-9]+\.[0-9]+ *: *[0-9]+\.[0-9]+|'
+                            '[0-9]+\.[0-9]+ *: *\.[0-9]+|'
+                            '[0-9]+\.[0-9]+ *: *[0-9]+\.|'
+                            '[0-9]+\.[0-9]+ *: *[0-9]+|'
+                            '[0-9]+\.[0-9]+ *: *"[^"]+"|'
+                            '[0-9]+\.[0-9]+ *: *\'[^\']+\'|'
+                            '[0-9]+\.[0-9]+ *: *\{[^\r^\n]+\}|'
+                            '[0-9]+\.[0-9]+ *: *\[[^\r^\n]+\]|'
+                            '\.[0-9]+ *: *[0-9]+\.[0-9]+|'
+                            '\.[0-9]+ *: *\.[0-9]+|'
+                            '\.[0-9]+ *: *[0-9]+\.|'
+                            '\.[0-9]+ *: *[0-9]+|'
+                            '\.[0-9]+ *: *"[^"]+"|'
+                            '\.[0-9]+ *: *\'[^\']+\'|'
+                            '\.[0-9]+ *: *\{[^\r^\n]+\}|'
+                            '\.[0-9]+ *: *\[[^\r^\n]+\]|'
+                            '[0-9]+\. *: *[0-9]+\.[0-9]+|'
+                            '[0-9]+\. *: *\.[0-9]+|'
+                            '[0-9]+\. *: *[0-9]+\.|'
+                            '[0-9]+\. *: *[0-9]+|'
+                            '[0-9]+\. *: *"[^"]+"|'
+                            '[0-9]+\. *: *\'[^\']+\'|'
+                            '[0-9]+\. *: *\{[^\r^\n]+\}|'
+                            '[0-9]+\. *: *\[[^\r^\n]+\]|'
+                            '[0-9]+ *: *[0-9]+\.[0-9]+|'
+                            '[0-9]+ *: *\.[0-9]+|'
+                            '[0-9]+ *: *[0-9]+\.|'
+                            '[0-9]+ *: *[0-9]+|'
+                            '[0-9]+ *: *"[^"]+"|'
+                            '[0-9]+ *: *\'[^\']+\'|'
+                            '[0-9]+ *: *\{[^\r^\n]+\}|'
+                            '[0-9]+ *: *\[[^\r^\n]+\]|'
+                            '"[^"]*" *: *[0-9]+\.[0-9]+|'
+                            '"[^"]*" *: *\.[0-9]+|'
+                            '"[^"]*" *: *[0-9]+\.|'
+                            '"[^"]*" *: *[0-9]+|'
+                            '"[^"]*" *: *"[^"]+"|'
+                            '"[^"]*" *: *\'[^\']+\'|'
+                            '"[^"]*" *: *\{[^\r^\n]+\}|'
+                            '"[^"]*" *: *\[[^\r^\n]+\]|'
+                            '\'[^\']*\' *: *[0-9]+\.[0-9]+|'
+                            '\'[^\']*\' *: *\.[0-9]+|'
+                            '\'[^\']*\' *[0-9]+\.|'
+                            '\'[^\']*\' *[0-9]+|'
+                            '\'[^\']*\' *: *"[^"]+"|'
+                            '\'[^\']*\' *: *\'[^\']+\'|'
+                            '\'[^\']*\' *: *\{[^\r^\n]+\}|'
+                            '\'[^\']*\' *: *\[[^\r^\n]+\]|'
+                            '\{[^\r^\n]+\} *: *[0-9]+\.[0-9]+|'
+                            '\{[^\r^\n]+\} *: *\.[0-9]+|'
+                            '\{[^\r^\n]+\} *[0-9]+\.|'
+                            '\{[^\r^\n]+\} *[0-9]+|'
+                            '\{[^\r^\n]+\} *: *"[^"]+"|'
+                            '\{[^\r^\n]+\} *: *\'[^\']+\'|'
+                            '\{[^\r^\n]+\} *: *\{[^\r^\n]+\}|'
+                            '\{[^\r^\n]+\} *: *\[[^\r^\n]+\]|'
+                            '\[[^\r^\n]+\] *: *[0-9]+\.[0-9]+|'
+                            '\[[^\r^\n]+\] *: *\.[0-9]+|'
+                            '\[[^\r^\n]+\] *[0-9]+\.|'
+                            '\[[^\r^\n]+\] *[0-9]+|'
+                            '\[[^\r^\n]+\] *: *"[^"]+"|'
+                            '\[[^\r^\n]+\] *: *\'[^\']+\'|'
+                            '\[[^\r^\n]+\] *: *\{[^\r^\n]+\}|'
+                            '\[[^\r^\n]+\] *: *\[[^\r^\n]+\]|'
+                            ',', value[1: -1])
+
+            d = {}
+
+            for item in r:
+                if item != ',':
+                    k, v = item.split(':', 1)
+                    d[self.parseValue(k.strip())] = self.parseValue(v.strip())
+
+            return d
+        elif value.startswith('['):
+            r = re.findall('[0-9]+\.[0-9]+|'
+                            '\.[0-9]+|'
+                            '[0-9]+\.|'
+                            '[0-9]+|'
+                            '"[^"]*"|'
+                            '\'[^\']*\'|'
+                            '\{[^\r^\n]+\}|'
+                            '\[[^\r^\n]+\]|'
+                            ',', value[1: -1])
+
+            l = []
+
+            for item in r:
+                if item != ',':
+                    l.append(self.parseValue(item))
+
+            return l
+        else:
+            try:
+                return int(value)
+            except:
+                try:
+                    return float(value)
+                except:
+                    return value
+
     def parsePipeline(self, pipeline=''):
         # sender receiver.slot<signal
         # receiver slot<sender.signal
@@ -84,11 +189,7 @@ class PipelineParser:
         for k, p in enumerate(r):
             if '=' in p:
                 key, value = p.split('=', 1)
-
-                if value.startswith('\'') or value.startswith('"'):
-                    value = value[1: -1]
-
-                properties[key] = value
+                properties[key] = self.parseValue(value)
             elif '<' in p:
                 s1, s2 = p.split('<')
 
@@ -469,7 +570,7 @@ if __name__ == '__main__':
                 'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
                 'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val10 el1.slot1<signal1'
 
-    pipeline2 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
+    pipeline2 = 'element1 objectName=el1 prop1={\'hola\': [9.87, \'chau\', \'perro\']} prop2=val2 ' \
                 'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 ' \
                 'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
                 'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
