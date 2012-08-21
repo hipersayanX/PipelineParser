@@ -22,7 +22,10 @@
 
 import re
 
+
+""" Pipeline parse class """
 class PipelineParser:
+    """ Enumerator for pipeline diff operations """
     class DiffOp:
         DisconnectSignalsAndSlots = 0
         DisconnectElement = 1
@@ -34,14 +37,19 @@ class PipelineParser:
         ConnectElement = 7
         ConnectSignalsAndSlots = 8
 
+    """ Take no argumments """
     def __init__(self):
-        self.instances1 = {}
-        self.connections1 = []
-        self.ss1 = []
+        # Previous pipeline graph.
+        self.instances1 = {}   # Nodes
+        self.connections1 = [] # Edges
+        self.ss1 = []          # Signals & Slots
 
+    """ Parse a string and returns the native value. """
     def parseValue(self, value):
+        # String
         if value.startswith('\'') or value.startswith('"'):
             return value[1: -1]
+        # Dictionary
         elif value.startswith('{'):
             r = re.findall('[0-9]+\.[0-9]+ *: *[0-9]+\.[0-9]+|'
                             '[0-9]+\.[0-9]+ *: *\.[0-9]+|'
@@ -117,6 +125,7 @@ class PipelineParser:
                     d[self.parseValue(k.strip())] = self.parseValue(v.strip())
 
             return d
+        # List
         elif value.startswith('['):
             r = re.findall('[0-9]+\.[0-9]+|'
                             '\.[0-9]+|'
@@ -142,54 +151,53 @@ class PipelineParser:
                 try:
                     return float(value)
                 except:
+                    # String
                     return value
 
+    """ Converts a pipeline description string into a graph. """
     def parsePipeline(self, pipeline=''):
-        # sender receiver.slot<signal
-        # receiver slot<sender.signal
-        # sender signal>receiver.slot
-        # receiver sender.signal>slot
-        #
-        # [sender, signal, receiver, slot]
-
         instances = {}
         pipes = []
         pipe = []
         elementName = ''
         properties = {}
         ss = []
-        i = 0
-        j = 0
+        i = 0 # Column
+        j = 0 # Row
 
-        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*=\'[^\']+\'|'                # Property strings.
+        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*=\'[^\']+\'|'    # Strings
                        '[a-zA-Z_][0-9a-zA-Z_]*="[^"]+"|'
-                       '[a-zA-Z_][0-9a-zA-Z_]*=\[[^\r^\n]+\]|'             # Property lists.
-                       '[a-zA-Z_][0-9a-zA-Z_]*=\{[^\r^\n]+\}|'             # Property dictionaries.
-                       '[a-zA-Z_][0-9a-zA-Z_]*=[^\r^\n^ ]+|'               # Property any.
-                       '!{1}|'                                             # Pipe.
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*<' # Signal & Slot
+                       '[a-zA-Z_][0-9a-zA-Z_]*=\[[^\r^\n]+\]|' # List
+                       '[a-zA-Z_][0-9a-zA-Z_]*=\{[^\r^\n]+\}|' # Dictionary
+                       '[a-zA-Z_][0-9a-zA-Z_]*=[^\r^\n^ ]+|'   # Any type.
+                       '!{1}|'                                 # Pipe.
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.'             # Signal & Slot
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*<'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*<'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*<[a-zA-Z_]+[0-9a-zA-Z_]*|'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*>'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
                        '[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*>'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_][0-9a-zA-Z_]*\.|'                         # Reference
-                       '[a-zA-Z_][0-9a-zA-Z_]*', pipeline)                 # Element.
+                       '[a-zA-Z_]+[0-9a-zA-Z_]*>[a-zA-Z_]+[0-9a-zA-Z_]*|'
+                       '[a-zA-Z_][0-9a-zA-Z_]*\.|'             # Reference
+                       '[a-zA-Z_][0-9a-zA-Z_]*', pipeline)     # Element.
 
         for k, p in enumerate(r):
+            # Parse property
             if '=' in p:
                 key, value = p.split('=', 1)
                 properties[key] = self.parseValue(value)
+            # Parse Signals & Slots
+            #
+            # sender receiver.slot<signal
+            # receiver slot<sender.signal
             elif '<' in p:
                 s1, s2 = p.split('<')
 
@@ -208,6 +216,10 @@ class PipelineParser:
                     signal = s2
 
                 ss.append([sender, signal, receiver, slot])
+            # Parse Signals & Slots
+            #
+            # sender signal>receiver.slot
+            # receiver sender.signal>slot
             elif '>' in p:
                 s1, s2 = p.split('>')
 
@@ -226,10 +238,12 @@ class PipelineParser:
                     slot = s2
 
                 ss.append([sender, signal, receiver, slot])
+            # Parse element
             else:
                 if elementName != '' and elementName != '!':
                     if not elementName.endswith('.'):
-                        instances['{0},{1}'.format(i, j)] = [elementName, properties]
+                        instances['{0},{1}'.format(i, j)] = \
+                                                    [elementName, properties]
 
                     pipe.append([elementName, properties])
 
@@ -247,7 +261,8 @@ class PipelineParser:
             if k == len(r) - 1:
                 if elementName != '' and elementName != '!':
                     if not elementName.endswith('.'):
-                        instances['{0},{1}'.format(i, j)] = [elementName, properties]
+                        instances['{0},{1}'.format(i, j)] = \
+                                                    [elementName, properties]
 
                     pipe.append([elementName, properties])
 
@@ -259,17 +274,21 @@ class PipelineParser:
                         i = 0
                         j += 1
 
+        # Solve references.
+        #
+        # i,j. -> x,y
         references = {}
 
         for pipe in pipes:
             for element in pipe:
                 if element[0].endswith('.'):
                     for instance in instances:
-                        if 'objectName' in instances[instance][1] and instances[instance][1]['objectName'] == element[0][:-1]:
+                        if 'objectName' in instances[instance][1] and \
+                           instances[instance][1]['objectName'] == \
+                                                                element[0][:-1]:
                             references[element[0]] = instance
 
-        # sender -> receiver
-
+        # Solve connections between elements.
         connections = []
 
         for j, pipe in enumerate(pipes):
@@ -289,6 +308,7 @@ class PipelineParser:
 
                     connections.append([cur, nxt])
 
+        # Solve signals & slots.
         for s in ss:
             if s[0].endswith('.'):
                 s[0] = references[s[0]]
@@ -298,6 +318,10 @@ class PipelineParser:
 
         return instances, connections, ss
 
+    """
+    Compare the 'pipeline2' graph with the previous pipeline graph and returns
+    the difference as instructions.
+    """
     def pipelineDiff(self, pipeline2=''):
         instances2, connections2, ss2 = self.parsePipeline(pipeline2)
 
@@ -320,31 +344,40 @@ class PipelineParser:
         connectSignalsAndSlots = []
 
         while cInstances1 != {}:
+            # Get an item from cInstances1.
             instance1 = cInstances1.popitem()
             bestMatchId = ''
 
+            # Find a similar element.
             for instance2 in cInstances2:
                 if instance1[1][0] == cInstances2[instance2][0]:
                     if bestMatchId == '':
                         bestMatchId = instance2
                     elif 'objectName' in instance1[1][1] and \
                          'objectName' in cInstances2[instance2][1] and \
-                         instance1[1][1]['objectName'] == cInstances2[instance2][1]['objectName']:
+                         instance1[1][1]['objectName'] == \
+                                        cInstances2[instance2][1]['objectName']:
                         bestMatchId = instance2
 
                         break
 
+            # There are no similar elements.
             if bestMatchId == '':
+                # Remove it from the previous pipeline.
                 removeElement.append(instance1[0])
+
+                # Remove it's connections.
                 i = 0
 
                 while i < len(cConnections1):
-                    if cConnections1[i][0] == instance1[0] or cConnections1[i][1] == instance1[0]:
+                    if cConnections1[i][0] == instance1[0] or \
+                       cConnections1[i][1] == instance1[0]:
                         disconnectElement.append(cConnections1[i])
                         del cConnections1[i]
                     else:
                         i += 1
 
+                # Remove it's signals & slots.
                 i = 0
 
                 while i < len(cSs1):
@@ -353,17 +386,27 @@ class PipelineParser:
                         del cSs1[i]
                     else:
                         i += 1
+            # There are at least one similar element.
             else:
+                # Change the Id of the element in pipeline1 by the Id of the
+                # element in pipeline2.
                 if instance1[0] != bestMatchId:
                     if bestMatchId in cInstances1:
-                        changeId.append([instance1[0], '.{0}'.format(bestMatchId)])
+                        # The new Id is used by other element. Change the Id to
+                        # a ghost Id.
+                        changeId.append([instance1[0],
+                                         '.{0}'.format(bestMatchId)])
                     else:
                         changeId.append([instance1[0], bestMatchId])
 
+                # Copy the properties from pipeline2 to the pipeline1.
                 setProps = {}
 
                 for prop in cInstances2[bestMatchId][1]:
-                    if not prop in instance1[1][1] or (prop in instance1[1][1] and cInstances2[bestMatchId][1][prop] != instance1[1][1][prop]):
+                    if not prop in instance1[1][1] or \
+                       (prop in instance1[1][1] and \
+                        cInstances2[bestMatchId][1][prop] != \
+                                                        instance1[1][1][prop]):
                         setProps[prop] = cInstances2[bestMatchId][1][prop]
 
                 if setProps != {}:
@@ -380,6 +423,7 @@ class PipelineParser:
 
                 del cInstances2[bestMatchId]
 
+        # Converts ghost Id to the final Id.
         i = 0
 
         while i < len(changeId):
@@ -391,6 +435,7 @@ class PipelineParser:
 
             i += 1
 
+        # Solve connections
         i = 0
 
         while i < len(cConnections1):
@@ -412,7 +457,8 @@ class PipelineParser:
                 if fst and snd:
                     break
 
-            if not dstConnection in cConnections2 and not list(reversed(dstConnection)) in cConnections2:
+            if not dstConnection in cConnections2 and \
+               not list(reversed(dstConnection)) in cConnections2:
                 disconnectElement.append(cConnections1[i])
                 del cConnections1[i]
             else:
@@ -439,12 +485,14 @@ class PipelineParser:
                 if fst and snd:
                     break
 
-            if not dstConnection in cConnections1 and not list(reversed(dstConnection)) in cConnections1:
+            if not dstConnection in cConnections1 and \
+               not list(reversed(dstConnection)) in cConnections1:
                 connectElement.append(cConnections2[i])
                 del cConnections2[i]
             else:
                 i += 1
 
+        # Solve signals & slots.
         i = 0
 
         while i < len(cSs1):
@@ -499,6 +547,7 @@ class PipelineParser:
             else:
                 i += 1
 
+        # Add elements in pipeline2 to pipeline1.
         addElement = {}
 
         for instance in cInstances2:
@@ -510,7 +559,8 @@ class PipelineParser:
             i = 0
 
             while i < len(cConnections2):
-                if cConnections2[i][0] == instance or cConnections2[i][1] == instance:
+                if cConnections2[i][0] == instance or \
+                   cConnections2[i][1] == instance:
                     connectElement.append(cConnections2[i])
                     del cConnections2[i]
                 else:
@@ -540,11 +590,13 @@ class PipelineParser:
             ops.append([self.DiffOp.ChangeId, change])
 
         for elementId in addElement:
-            ops.append([self.DiffOp.AddElement, [elementId, addElement[elementId]]])
+            ops.append([self.DiffOp.AddElement,
+                        [elementId, addElement[elementId]]])
 
         for elementId in setProperties:
             for prop in setProperties[elementId]:
-                ops.append([self.DiffOp.SetProperties, [elementId, prop, setProperties[elementId][prop]]])
+                ops.append([self.DiffOp.SetProperties,
+                            [elementId, prop, setProperties[elementId][prop]]])
 
         for elementId in resetProperties:
             for prop in resetProperties[elementId]:
@@ -556,6 +608,7 @@ class PipelineParser:
         for ss in connectSignalsAndSlots:
             ops.append([self.DiffOp.ConnectSignalsAndSlots, ss])
 
+        # Set pipeline2 as the new pipeline.
         self.instances1 = instances2
         self.connections1 = connections2
         self.ss1 = ss2
@@ -566,12 +619,16 @@ class PipelineParser:
 if __name__ == '__main__':
     pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
                 'el1. ! element2 ' \
-                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element1 signal>el1.slot ! element5 ! el5. ' \
+                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! ' \
+                'element1 signal>el1.slot ! element5 ! el5. ' \
                 'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
-                'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val10 el1.slot1<signal1'
+                'element5 objectName=el5 el1.signal2>slot2 !' \
+                'element6 prop1=val10 el1.slot1<signal1'
 
-    pipeline2 = 'element1 objectName=el1 prop1={\'hola\': [9.87, \'chau\', \'perro\']} prop2=val2 ' \
-                'element5 objectName=el5 el1.signal2>slot2 ! element6 prop1=val1 ' \
+    pipeline2 = 'element1 objectName=el1 ' \
+                'prop1={\'hello\': [9.87, 98, "value"]} prop2=val2 ' \
+                'element5 objectName=el5 el1.signal2>slot2 ! ' \
+                'element6 prop1=val1 ' \
                 'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
                 'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
                 'el1. ! element2 signal1>el5.slot1 ' \
