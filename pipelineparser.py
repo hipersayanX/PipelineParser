@@ -37,12 +37,30 @@ class PipelineParser:
         ConnectElement = 7
         ConnectSignalsAndSlots = 8
 
+    """ Actions to do if some element doesn't exist """
+    class FailProofLevel:
+        Fail = 0     # If an element doesn't exist return a void graph.
+        Continue = 1 # If an element doesn't exist return a graph without the
+                     # element and it's connections.
+        Force = 2    # If an element doesn't exist try to connect all elements
+                     # connected to the lost element.
+
     """ Take no argumments """
     def __init__(self):
         # Previous pipeline graph.
         self.instances1 = {}   # Nodes
         self.connections1 = [] # Edges
         self.ss1 = []          # Signals & Slots
+        self.availableElementTypes = []
+        self.failProofLevel = self.FailProofLevel.Fail
+
+    """ Set a list of valid elements. """
+    def setAvailableElementsTypes(self, availableElementTypes=[]):
+        self.availableElementTypes = availableElementTypes
+
+    """ Set fail proof level """
+    def setFailProofLevel(self, failProofLevel=FailProofLevel.Fail):
+        self.failProofLevel = failProofLevel
 
     """ Parse a string and returns the native value. """
     def parseValue(self, value):
@@ -51,71 +69,12 @@ class PipelineParser:
             return value[1: -1]
         # Dictionary
         elif value.startswith('{'):
-            r = re.findall('[0-9]+\.[0-9]+ *: *[0-9]+\.[0-9]+|'
-                            '[0-9]+\.[0-9]+ *: *\.[0-9]+|'
-                            '[0-9]+\.[0-9]+ *: *[0-9]+\.|'
-                            '[0-9]+\.[0-9]+ *: *[0-9]+|'
-                            '[0-9]+\.[0-9]+ *: *"[^"]+"|'
-                            '[0-9]+\.[0-9]+ *: *\'[^\']+\'|'
-                            '[0-9]+\.[0-9]+ *: *\{[^\r^\n]+\}|'
-                            '[0-9]+\.[0-9]+ *: *\[[^\r^\n]+\]|'
-                            '\.[0-9]+ *: *[0-9]+\.[0-9]+|'
-                            '\.[0-9]+ *: *\.[0-9]+|'
-                            '\.[0-9]+ *: *[0-9]+\.|'
-                            '\.[0-9]+ *: *[0-9]+|'
-                            '\.[0-9]+ *: *"[^"]+"|'
-                            '\.[0-9]+ *: *\'[^\']+\'|'
-                            '\.[0-9]+ *: *\{[^\r^\n]+\}|'
-                            '\.[0-9]+ *: *\[[^\r^\n]+\]|'
-                            '[0-9]+\. *: *[0-9]+\.[0-9]+|'
-                            '[0-9]+\. *: *\.[0-9]+|'
-                            '[0-9]+\. *: *[0-9]+\.|'
-                            '[0-9]+\. *: *[0-9]+|'
-                            '[0-9]+\. *: *"[^"]+"|'
-                            '[0-9]+\. *: *\'[^\']+\'|'
-                            '[0-9]+\. *: *\{[^\r^\n]+\}|'
-                            '[0-9]+\. *: *\[[^\r^\n]+\]|'
-                            '[0-9]+ *: *[0-9]+\.[0-9]+|'
-                            '[0-9]+ *: *\.[0-9]+|'
-                            '[0-9]+ *: *[0-9]+\.|'
-                            '[0-9]+ *: *[0-9]+|'
-                            '[0-9]+ *: *"[^"]+"|'
-                            '[0-9]+ *: *\'[^\']+\'|'
-                            '[0-9]+ *: *\{[^\r^\n]+\}|'
-                            '[0-9]+ *: *\[[^\r^\n]+\]|'
-                            '"[^"]*" *: *[0-9]+\.[0-9]+|'
-                            '"[^"]*" *: *\.[0-9]+|'
-                            '"[^"]*" *: *[0-9]+\.|'
-                            '"[^"]*" *: *[0-9]+|'
-                            '"[^"]*" *: *"[^"]+"|'
-                            '"[^"]*" *: *\'[^\']+\'|'
-                            '"[^"]*" *: *\{[^\r^\n]+\}|'
-                            '"[^"]*" *: *\[[^\r^\n]+\]|'
-                            '\'[^\']*\' *: *[0-9]+\.[0-9]+|'
-                            '\'[^\']*\' *: *\.[0-9]+|'
-                            '\'[^\']*\' *[0-9]+\.|'
-                            '\'[^\']*\' *[0-9]+|'
-                            '\'[^\']*\' *: *"[^"]+"|'
-                            '\'[^\']*\' *: *\'[^\']+\'|'
-                            '\'[^\']*\' *: *\{[^\r^\n]+\}|'
-                            '\'[^\']*\' *: *\[[^\r^\n]+\]|'
-                            '\{[^\r^\n]+\} *: *[0-9]+\.[0-9]+|'
-                            '\{[^\r^\n]+\} *: *\.[0-9]+|'
-                            '\{[^\r^\n]+\} *[0-9]+\.|'
-                            '\{[^\r^\n]+\} *[0-9]+|'
-                            '\{[^\r^\n]+\} *: *"[^"]+"|'
-                            '\{[^\r^\n]+\} *: *\'[^\']+\'|'
-                            '\{[^\r^\n]+\} *: *\{[^\r^\n]+\}|'
-                            '\{[^\r^\n]+\} *: *\[[^\r^\n]+\]|'
-                            '\[[^\r^\n]+\] *: *[0-9]+\.[0-9]+|'
-                            '\[[^\r^\n]+\] *: *\.[0-9]+|'
-                            '\[[^\r^\n]+\] *[0-9]+\.|'
-                            '\[[^\r^\n]+\] *[0-9]+|'
-                            '\[[^\r^\n]+\] *: *"[^"]+"|'
-                            '\[[^\r^\n]+\] *: *\'[^\']+\'|'
-                            '\[[^\r^\n]+\] *: *\{[^\r^\n]+\}|'
-                            '\[[^\r^\n]+\] *: *\[[^\r^\n]+\]|'
-                            ',', value[1: -1])
+            r = re.findall('(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|"[^"]*"|'
+                           '\'[^\']*\'|\{[^\r^\n]*\}|\[[^\r^\n]*\])'
+                           ' *: *'
+                           '(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|"[^"]*"|'
+                           '\'[^\']*\'|\{[^\r^\n]*\}|\[[^\r^\n]*\])|'
+                           ',', value[1: -1])
 
             d = {}
 
@@ -133,8 +92,8 @@ class PipelineParser:
                             '[0-9]+|'
                             '"[^"]*"|'
                             '\'[^\']*\'|'
-                            '\{[^\r^\n]+\}|'
-                            '\[[^\r^\n]+\]|'
+                            '\{[^\r^\n]*\}|'
+                            '\[[^\r^\n]*\]|'
                             ',', value[1: -1])
 
             l = []
@@ -165,29 +124,14 @@ class PipelineParser:
         i = 0 # Column
         j = 0 # Row
 
-        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*=\'[^\']+\'|'    # Strings
-                       '[a-zA-Z_][0-9a-zA-Z_]*="[^"]+"|'
-                       '[a-zA-Z_][0-9a-zA-Z_]*=\[[^\r^\n]+\]|' # List
-                       '[a-zA-Z_][0-9a-zA-Z_]*=\{[^\r^\n]+\}|' # Dictionary
-                       '[a-zA-Z_][0-9a-zA-Z_]*=[^\r^\n^ ]+|'   # Any type.
-                       '!{1}|'                                 # Pipe.
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.'             # Signal & Slot
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*<'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*<'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*<[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*>'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*\.[a-zA-Z_]+[0-9a-zA-Z_]*>'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_]+[0-9a-zA-Z_]*>[a-zA-Z_]+[0-9a-zA-Z_]*|'
-                       '[a-zA-Z_][0-9a-zA-Z_]*\.|'             # Reference
-                       '[a-zA-Z_][0-9a-zA-Z_]*', pipeline)     # Element.
+        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*'                   # Element
+                       '(?:=(?:\'[^\']+\'|"[^"]+"|\[[^\r^\n]+\]|' # Property
+                       '\{[^\r^\n]+\}|[^\r^\n^ ^!]+)|'
+                       '(?:\.[a-zA-Z_]+[0-9a-zA-Z_]*){0,1}'       # Signals &
+                       '(?:<|>)[a-zA-Z_]+[0-9a-zA-Z_]*'           # Slots
+                       '(?:\.[a-zA-Z_]+[0-9a-zA-Z_]*){0,1}|'
+                       '\.{0,1})|'                                # Reference
+                       '!{1}', pipeline)                          # Pipe
 
         for k, p in enumerate(r):
             # Parse property
