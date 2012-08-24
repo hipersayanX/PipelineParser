@@ -38,12 +38,13 @@ class PipelineParser:
         ConnectSignalsAndSlots = 8
 
     """ Actions to do if some element doesn't exist """
-    class FailProofLevel:
-        Fail = 0     # If an element doesn't exist return a void graph.
-        Continue = 1 # If an element doesn't exist return a graph without the
-                     # element and it's connections.
-        Force = 2    # If an element doesn't exist try to connect all elements
-                     # connected to the lost element.
+    class PipelineRoutingMode:
+        NoCheck = 0
+        Fail = 1    # If an element doesn't exist return a void graph.
+        Remove = 2  # If an element doesn't exist return a graph without the
+                    # element and it's connections.
+        Force = 3   # If an element doesn't exist try to connect all elements
+                    # connected to the lost element.
 
     """ Take no argumments """
     def __init__(self):
@@ -52,15 +53,15 @@ class PipelineParser:
         self.connections1 = [] # Edges
         self.ss1 = []          # Signals & Slots
         self.availableElementTypes = []
-        self.failProofLevel = self.FailProofLevel.Fail
+        self.pipelineRoutingMode = self.PipelineRoutingMode.NoCheck
 
     """ Set a list of valid elements. """
     def setAvailableElementsTypes(self, availableElementTypes=[]):
         self.availableElementTypes = availableElementTypes
 
     """ Set fail proof level """
-    def setFailProofLevel(self, failProofLevel=FailProofLevel.Fail):
-        self.failProofLevel = failProofLevel
+    def setPipelineRoutingMode(self, mode=PipelineRoutingMode.NoCheck):
+        self.pipelineRoutingMode = mode
 
     """ Parse a string and returns the native value. """
     def parseValue(self, value):
@@ -186,6 +187,11 @@ class PipelineParser:
             else:
                 if elementName != '' and elementName != '!':
                     if not elementName.endswith('.'):
+                        if self.pipelineRoutingMode == \
+                           self.PipelineRoutingMode.Fail and \
+                           not elementName in self.availableElementTypes:
+                            return {}, [], []
+
                         instances['{0},{1}'.format(i, j)] = \
                                                     [elementName, properties]
 
@@ -259,6 +265,48 @@ class PipelineParser:
 
             if s[2].endswith('.'):
                 s[2] = references[s[2]]
+
+        if self.pipelineRoutingMode == self.PipelineRoutingMode.Remove or \
+           self.pipelineRoutingMode == self.PipelineRoutingMode.Force:
+            removeId = []
+
+            for id in instances:
+                if not instances[id][0] in self.availableElementTypes:
+                    removeId.append(id)
+
+            for id in removeId:
+                del instances[id]
+
+                i = 0
+                conns = []
+
+                while i < len(connections):
+                    if connections[i][0] == id or connections[i][1] == id:
+                        if connections[i][0] != id:
+                            conns.append(connections[i][0])
+
+                        if connections[i][1] != id:
+                            conns.append(connections[i][1])
+
+                        del connections[i]
+                    else:
+                        i += 1
+
+                if self.pipelineRoutingMode == self.PipelineRoutingMode.Force:
+                    for conn1 in conns:
+                        for conn2 in conns:
+                            if conn1 != conn2 and \
+                               not [conn1, conn2] in connections and \
+                               not reversed([conn1, conn2]) in connections:
+                                connections.append([conn1, conn2])
+
+                i = 0
+
+                while i < len(ss):
+                    if ss[i][0] == id or ss[i][2] == id:
+                        del ss[i]
+                    else:
+                        i += 1
 
         return instances, connections, ss
 
@@ -581,6 +629,17 @@ if __name__ == '__main__':
 
     pp = PipelineParser()
 
+    pp.setAvailableElementsTypes(['element1',
+                                  'element2',
+                                  #'element3',
+                                  'element4',
+                                  'element5',
+                                  'element6',
+                                  'element10',
+                                  'element11',
+                                  'element12'])
+
+    pp.setPipelineRoutingMode(PipelineParser.PipelineRoutingMode.Force)
     pp.pipelineDiff(pipeline1)
 
     for op in pp.pipelineDiff(pipeline2):
