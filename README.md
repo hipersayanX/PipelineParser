@@ -95,3 +95,29 @@ Here is a little example:
 
     # Parse a pipeline and returns the graph.
     instances, connections, signalsAndSlots = pp.parsePipeline(pipeline2)
+
+## Pipeline routing mode ##
+
+The pipeline routing mode defines the way in wich the graph nodes will be connected in the case in wich one or more elements types doesn't exist. Four case are possible:
+
+1. __NoCheck__: Build the pipeline as is.
+2. __Fail__: If an element doesn't exist return a void graph.
+3. __Remove__: If an element doesn't exist return a graph without the element and it's connections.
+4. __Force__: If an element doesn't exist try to connect all elements connected to the lost element.
+
+You can setup the routing mode as follows:
+
+    pp = PipelineParser()
+
+    pp.setAvailableElementsTypes(['element1',
+                                  'element2',
+                                  #'element3', # This element doesn't exist
+                                  'element4',
+                                  'element5',
+                                  #'element6', # This element doesn't exist
+                                  'element10',
+                                  'element11',
+                                  'element12'])
+
+    pp.setPipelineRoutingMode(PipelineParser.PipelineRoutingMode.Force)
+ 

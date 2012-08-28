@@ -39,7 +39,7 @@ class PipelineParser:
 
     """ Actions to do if some element doesn't exist """
     class PipelineRoutingMode:
-        NoCheck = 0
+        NoCheck = 0 # Build the pipeline as is.
         Fail = 1    # If an element doesn't exist return a void graph.
         Remove = 2  # If an element doesn't exist return a graph without the
                     # element and it's connections.
