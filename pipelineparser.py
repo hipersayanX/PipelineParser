@@ -125,26 +125,33 @@ class PipelineParser:
         i = 0 # Column
         j = 0 # Row
 
-        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*'                   # Element
-                       '(?:=(?:\'[^\']+\'|"[^"]+"|\[[^\r^\n]+\]|' # Property
-                       '\{[^\r^\n]+\}|[^\r^\n^ ^!]+)|'
-                       '(?:\.[a-zA-Z_]+[0-9a-zA-Z_]*){0,1}'       # Signals &
-                       '(?:<|>)[a-zA-Z_]+[0-9a-zA-Z_]*'           # Slots
-                       '(?:\.[a-zA-Z_]+[0-9a-zA-Z_]*){0,1}|'
-                       '\.{0,1})|'                                # Reference
-                       '!{1}', pipeline)                          # Pipe
+        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*\ *=\ *(?:\'[^\']+\'|"[^"]+"|' \
+                       '\[[^\r^\n]+\]|\{[^\r^\n]+\}|[^\r^\n^ ^!]+)|' \
+                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.){0,1}' \
+                       '[a-zA-Z_][0-9a-zA-Z_]*\ *' \
+                       '\(\ *(?:[a-zA-Z_][0-9a-zA-Z_]*\ *' \
+                       '(?:,\ *[a-zA-Z_][0-9a-zA-Z_]*)*){0,1}\ *\)' \
+                       '\ *(?:<|>)\ *' \
+                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.){0,1}' \
+                       '[a-zA-Z_][0-9a-zA-Z_]*\ *' \
+                       '\(\ *(?:[a-zA-Z_][0-9a-zA-Z_]*\ *' \
+                       '(?:,\ *[a-zA-Z_][0-9a-zA-Z_]*)*){0,1}\ *\)|' \
+                       '[a-zA-Z_][0-9a-zA-Z_]*\.{0,1}|' \
+                       '!{1}', pipeline)
 
         for k, p in enumerate(r):
             # Parse property
             if '=' in p:
                 key, value = p.split('=', 1)
-                properties[key] = self.parseValue(value)
+                properties[key.strip()] = self.parseValue(value.strip())
             # Parse Signals & Slots
             #
-            # sender receiver.slot<signal
-            # receiver slot<sender.signal
+            # sender receiver.slot([type1, tipe2, ...])<signal([type1, tipe2, ...])
+            # receiver slot([type1, tipe2, ...])<sender.signal([type1, tipe2, ...])
             elif '<' in p:
                 s1, s2 = p.split('<')
+                s1 = s1.strip()
+                s2 = s2.strip()
 
                 if '.' in s1:
                     receiver, slot = s1.split('.')
@@ -160,13 +167,18 @@ class PipelineParser:
                     sender = '{0},{1}'.format(i, j)
                     signal = s2
 
+                signal = ''.join(signal.split())
+                slot = ''.join(slot.split())
+
                 ss.append([sender, signal, receiver, slot])
             # Parse Signals & Slots
             #
-            # sender signal>receiver.slot
-            # receiver sender.signal>slot
+            # sender signal([type1, tipe2, ...])>receiver.slot([type1, tipe2, ...])
+            # receiver sender.signal([type1, tipe2, ...])>slot([type1, tipe2, ...])
             elif '>' in p:
                 s1, s2 = p.split('>')
+                s1 = s1.strip()
+                s2 = s2.strip()
 
                 if '.' in s1:
                     sender, signal = s1.split('.')
@@ -181,6 +193,9 @@ class PipelineParser:
                 else:
                     receiver = '{0},{1}'.format(i, j)
                     slot = s2
+
+                signal = ''.join(signal.split())
+                slot = ''.join(slot.split())
 
                 ss.append([sender, signal, receiver, slot])
             # Parse element
@@ -612,20 +627,20 @@ if __name__ == '__main__':
     pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
                 'el1. ! element2 ' \
                 'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! ' \
-                'element1 signal>el1.slot ! element5 ! el5. ' \
-                'element4 prop1=3.14 prop10=50 slot5<el5.signal5 ! el5. ' \
-                'element5 objectName=el5 el1.signal2>slot2 !' \
-                'element6 prop1=val10 el1.slot1<signal1'
+                'element1 signal()>el1.slot() ! element5 ! el5. ' \
+                'element4 prop1=3.14 prop10=50 slot5(int, int, int)<el5.signal5(int, int, int) ! el5. ' \
+                'element5 objectName=el5 el1.signal2()>slot2() ! ' \
+                'element6 prop1=val10 el1.slot1()<signal1()'
 
     pipeline2 = 'element1 objectName=el1 ' \
                 'prop1={\'hello\': [9.87, 98, "value"]} prop2=val2 ' \
-                'element5 objectName=el5 el1.signal2>slot2 ! ' \
+                'element5 objectName=el5 el1.signal2()>slot2() ! ' \
                 'element6 prop1=val1 ' \
-                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! element5 ' \
-                'element4 prop1=3.14 slot5<el5.signal5 ! el5. ' \
-                'el1. ! element2 signal1>el5.slot1 ' \
+                'el1. ! element3 prop3="Hola, mundo cruel !!!" ! element5 ' \
+                'element4 prop1=3.14 slot5(int, int, int)<el5.signal5(int, int, int) ! el5. ' \
+                'el1. ! element2 signal1(QString)>el5.slot1(QString) ' \
                 'element10 prop1=78 ! element12 ' \
-                'element11 signal1>el5.slot1'
+                'element11 signal1()>el5.slot1()'
 
     pp = PipelineParser()
 

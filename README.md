@@ -63,18 +63,18 @@ In the example above, _element1_,  _element3_ and  _element5_ are connected to  
 
 This parser also add a special syntax for [Qt](http://qt-project.org/) based programs that allows connecting two elements using signals & slots. Here is an example:
 
-    element1 prop1=value1 signal1>refel2.slot2 ! element2 objectName=refel2 ! element3 element4
+    element1 prop1=value1 signal1(int, QString)>refel2.slot2(int, QString) ! element2 objectName=refel2 ! element3 element4
 
 This will connect the _signal1_ signal from _element1_ element to _slot2_ slot of the _element2_ element. The signals & slots syntax is as follow.
 
-    sender signal>receiver.slot
-    receiver sender.signal>slot
-    sender receiver.slot<signal
-    receiver slot<sender.signal
-    element signal>slot                 # Self connection
-    element slot<signal
-    element sender.signal>receiver.slot # Extern connection
-    element receiver.slot<sender.signal
+    sender signal([type1, tipe2, ...])>receiver.slot([type1, tipe2, ...])
+    receiver sender.signal([type1, tipe2, ...])>slot([type1, tipe2, ...])
+    sender receiver.slot([type1, tipe2, ...])<signal([type1, tipe2, ...])
+    receiver slot([type1, tipe2, ...])<sender.signal([type1, tipe2, ...])
+    element signal([type1, tipe2, ...])>slot([type1, tipe2, ...])                 # Self connection
+    element slot([type1, tipe2, ...])<signal([type1, tipe2, ...])
+    element sender.signal([type1, tipe2, ...])>receiver.slot([type1, tipe2, ...]) # Extern connection
+    element receiver.slot([type1, tipe2, ...])<sender.signal([type1, tipe2, ...])
 
 # Parser module #
 
