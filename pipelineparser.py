@@ -70,11 +70,11 @@ class PipelineParser:
             return value[1: -1]
         # Dictionary
         elif value.startswith('{'):
-            r = re.findall('(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|"[^"]*"|'
-                           '\'[^\']*\'|\{[^\r^\n]*\}|\[[^\r^\n]*\])'
+            r = re.findall('(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|".*"|'
+                           '\'.*\'|\{.*\}|\[.*\])'
                            ' *: *'
-                           '(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|"[^"]*"|'
-                           '\'[^\']*\'|\{[^\r^\n]*\}|\[[^\r^\n]*\])|'
+                           '(?:[0-9]+\.[0-9]+|\.[0-9]+|[0-9]+\.|[0-9]+|".*"|'
+                           '\'.*\'|\{.*\}|\[.*\])|'
                            ',', value[1: -1])
 
             d = {}
@@ -91,10 +91,10 @@ class PipelineParser:
                             '\.[0-9]+|'
                             '[0-9]+\.|'
                             '[0-9]+|'
-                            '"[^"]*"|'
-                            '\'[^\']*\'|'
-                            '\{[^\r^\n]*\}|'
-                            '\[[^\r^\n]*\]|'
+                            '".*"|'
+                            '\'.*\'|'
+                            '\{.*\}|'
+                            '\[.*\]|'
                             ',', value[1: -1])
 
             l = []
@@ -125,30 +125,44 @@ class PipelineParser:
         i = 0 # Column
         j = 0 # Row
 
-        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]*\ *=\ *(?:\'[^\']+\'|"[^"]+"|' \
-                       '\[[^\r^\n]+\]|\{[^\r^\n]+\}|[^\r^\n^ ^!]+)|' \
-                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.){0,1}' \
-                       '[a-zA-Z_][0-9a-zA-Z_]*\ *' \
-                       '\(\ *(?:[a-zA-Z_][0-9a-zA-Z_]*\ *' \
-                       '(?:,\ *[a-zA-Z_][0-9a-zA-Z_]*)*){0,1}\ *\)' \
-                       '\ *(?:<|>)\ *' \
-                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.){0,1}' \
-                       '[a-zA-Z_][0-9a-zA-Z_]*\ *' \
-                       '\(\ *(?:[a-zA-Z_][0-9a-zA-Z_]*\ *' \
-                       '(?:,\ *[a-zA-Z_][0-9a-zA-Z_]*)*){0,1}\ *\)|' \
-                       '[a-zA-Z_][0-9a-zA-Z_]*\.{0,1}|' \
-                       '!{1}', pipeline)
+        r = re.findall('[a-zA-Z_][0-9a-zA-Z_]* *= *(?:\'.*\'|".*"|'
+                       '\[.*\]|\{.*\}|[^\r^\n^ ^!]+)|'
+                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                       '[a-zA-Z_][0-9a-zA-Z_]* *'
+                       '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                       '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)'
+                       ' *(?:<|>) *'
+                       '(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                       '[a-zA-Z_][0-9a-zA-Z_]* *'
+                       '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                       '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)|'
+                       '[a-zA-Z_][0-9a-zA-Z_]*\.?|'
+                       '!', pipeline)
 
         for k, p in enumerate(r):
             # Parse property
-            if '=' in p:
+            if re.match('[a-zA-Z_][0-9a-zA-Z_]* *= *'
+                        '(?:\'.*\'|'
+                        '".*"|'
+                        '\[.*\]|'
+                        '\{.*\}|'
+                        '[^\r^\n^ ^!]+)', p) != None:
                 key, value = p.split('=', 1)
                 properties[key.strip()] = self.parseValue(value.strip())
             # Parse Signals & Slots
             #
-            # sender receiver.slot([type1, tipe2, ...])<signal([type1, tipe2, ...])
-            # receiver slot([type1, tipe2, ...])<sender.signal([type1, tipe2, ...])
-            elif '<' in p:
+            # sender receiver.slot([type1, tipe2, ...])<signal([type1, type2, ...])
+            # receiver slot([type1, tipe2, ...])<sender.signal([type1, type2, ...])
+            elif re.match('(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                          '[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)'
+                          ' *< *'
+                          '(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                          '[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)',
+                          p) != None:
                 s1, s2 = p.split('<')
                 s1 = s1.strip()
                 s2 = s2.strip()
@@ -173,9 +187,18 @@ class PipelineParser:
                 ss.append([sender, signal, receiver, slot])
             # Parse Signals & Slots
             #
-            # sender signal([type1, tipe2, ...])>receiver.slot([type1, tipe2, ...])
-            # receiver sender.signal([type1, tipe2, ...])>slot([type1, tipe2, ...])
-            elif '>' in p:
+            # sender signal([type1, tipe2, ...])>receiver.slot([type1, type2, ...])
+            # receiver sender.signal([type1, tipe2, ...])>slot([type1, type2, ...])
+            elif re.match('(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                          '[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)'
+                          ' *> *'
+                          '(?:[a-zA-Z_][0-9a-zA-Z_]*\.)?'
+                          '[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '\( *(?:[a-zA-Z_][0-9a-zA-Z_]* *'
+                          '(?:, *[a-zA-Z_][0-9a-zA-Z_]*)*)? *\)',
+                          p) != None:
                 s1, s2 = p.split('>')
                 s1 = s1.strip()
                 s2 = s2.strip()
@@ -311,8 +334,7 @@ class PipelineParser:
                     for conn1 in conns:
                         for conn2 in conns:
                             if conn1 != conn2 and \
-                               not [conn1, conn2] in connections and \
-                               not reversed([conn1, conn2]) in connections:
+                               not [conn1, conn2] in connections:
                                 connections.append([conn1, conn2])
 
                 i = 0
@@ -464,8 +486,7 @@ class PipelineParser:
                 if fst and snd:
                     break
 
-            if not dstConnection in cConnections2 and \
-               not list(reversed(dstConnection)) in cConnections2:
+            if not dstConnection in cConnections2:
                 disconnectElement.append(cConnections1[i])
                 del cConnections1[i]
             else:
@@ -492,8 +513,7 @@ class PipelineParser:
                 if fst and snd:
                     break
 
-            if not dstConnection in cConnections1 and \
-               not list(reversed(dstConnection)) in cConnections1:
+            if not dstConnection in cConnections1:
                 connectElement.append(cConnections2[i])
                 del cConnections2[i]
             else:
@@ -626,7 +646,7 @@ class PipelineParser:
 if __name__ == '__main__':
     pipeline1 = 'element1 objectName=el1 prop1=10 prop2=val2 ' \
                 'el1. ! element2 ' \
-                'el1. ! element3 prop3=\"Hola, mundo cruel !!!\" ! ' \
+                'el1. ! element3 prop3="Hola, mundo cruel !!!" ! ' \
                 'element1 signal()>el1.slot() ! element5 ! el5. ' \
                 'element4 prop1=3.14 prop10=50 slot5(int, int, int)<el5.signal5(int, int, int) ! el5. ' \
                 'element5 objectName=el5 el1.signal2()>slot2() ! ' \
