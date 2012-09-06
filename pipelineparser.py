@@ -316,26 +316,27 @@ class PipelineParser:
                 del instances[id]
 
                 i = 0
-                conns = []
+                iConns = []
+                oConns = []
 
                 while i < len(connections):
                     if connections[i][0] == id or connections[i][1] == id:
                         if connections[i][0] != id:
-                            conns.append(connections[i][0])
+                            iConns.append(connections[i][0])
 
                         if connections[i][1] != id:
-                            conns.append(connections[i][1])
+                            oConns.append(connections[i][1])
 
                         del connections[i]
                     else:
                         i += 1
 
                 if self.pipelineRoutingMode == self.PipelineRoutingMode.Force:
-                    for conn1 in conns:
-                        for conn2 in conns:
-                            if conn1 != conn2 and \
-                               not [conn1, conn2] in connections:
-                                connections.append([conn1, conn2])
+                    for iConn in iConns:
+                        for oConn in oConns:
+                            if iConn != oConn and \
+                               not [iConn, oConn] in connections:
+                                connections.append([iConn, oConn])
 
                 i = 0
 
